@@ -25,3 +25,26 @@ Duplicate the .env.example file and rename it to .env:
 
 ## Access the Application
 http://localhost
+
+# API
+
+## POST /api/jobs
+
+### Body example
+```json
+{
+    "scrape": [
+        {
+            "url": "https://tandemum.lt/apie-mus",
+            "selectors": {
+                "wrapper": ".team__member",
+                "map": {
+                    "name": ".team__member-name",
+                    "role": ".team__member-role"
+                }
+
+            }
+        }
+    ]
+}
+```
