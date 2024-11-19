@@ -28,8 +28,6 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
      */
     public function handle(CrawlerService $crawler): void
     {
-        Redis::set('job:' . $this->id . ':status', JobStatusEnum::PENDING->value);
-
         $crawler->input($this->data['url'])
             ->addStep(Http::get())
             ->addStep(

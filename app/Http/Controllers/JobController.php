@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\JobStatusEnum;
 use App\Http\Requests\StoreJobRequest;
 use App\Jobs\ProcessScrape;
 use Illuminate\Http\JsonResponse;
@@ -20,11 +21,13 @@ class JobController extends Controller
             $scrapeJob['id'] = $id;
 
             Redis::set('job:' . $id, json_encode($scrapeJob));
+            Redis::set('job:' . $id . ':status', JobStatusEnum::PENDING->value);
             ProcessScrape::dispatch(id: $id, data: $scrapeJob);
         }
 
         return $this->sendSuccess([
             'job' => json_decode(Redis::get('job:' . $id)),
+            'status' => Redis::get('job:' . $id . ':status'),
         ]);
     }
 
