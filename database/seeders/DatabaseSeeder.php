@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Log;
 
 class DatabaseSeeder extends Seeder
 {
@@ -14,11 +15,11 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $user = User::factory()->create([
-            'name' => 'Justinas',
-            'email' => 'bernatavicius.justinas@gmail.com',
-            'password' => 'justinas'
+            'name' => 'Test Name',
+            'email' => 'test@email.com',
+            'password' => 'test'
         ]);
 
-        $user->createToken('client');
+        Log::info('User Api Key: ' . $user->createToken('client')->plainTextToken);
     }
 }
