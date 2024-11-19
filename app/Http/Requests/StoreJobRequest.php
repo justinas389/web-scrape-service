@@ -22,10 +22,8 @@ class StoreJobRequest extends FormRequest
     public function rules(): array
     {
         return [
-            '*' => [
-                'url' => ['required'],
-                'selectors' => ['required', 'array'],
-            ],
+            'scrape.*.url' => 'required|active_url',
+            'scrape.*.selectors' => 'required',
         ];
     }
 }
