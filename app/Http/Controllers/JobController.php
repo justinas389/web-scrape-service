@@ -16,19 +16,24 @@ class JobController extends Controller
      */
     public function store(StoreJobRequest $request): JsonResponse
     {   
-        foreach ($request->validated()['scrape'] as $scrapeJob) {
-            $id = Redis::incr('job:id_counter');
-            $scrapeJob['id'] = $id;
+        $jobs = [];
 
-            Redis::set('job:' . $id, json_encode($scrapeJob));
-            Redis::set('job:' . $id . ':status', JobStatusEnum::PENDING->value);
-            ProcessScrape::dispatch(id: $id, data: $scrapeJob);
+        foreach ($request->validated()['scrape'] as $scrapeJob) {
+            $job = [
+                'id' => Redis::incr('job:id_counter'),
+                'url' => $scrapeJob['url'],
+                'selectors' => $scrapeJob['selectors'],
+                'status' => JobStatusEnum::PENDING->value
+            ];
+
+            Redis::set('job:' . $job['id'], json_encode($job));
+
+            ProcessScrape::dispatch($job);
+
+            $jobs[] = $job;
         }
 
-        return $this->sendSuccess([
-            'job' => json_decode(Redis::get('job:' . $id)),
-            'status' => Redis::get('job:' . $id . ':status'),
-        ]);
+        return $this->sendSuccess($jobs);
     }
 
     /**
@@ -36,21 +41,13 @@ class JobController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $id = $request->route('job');
-        $job = Redis::get('job:' . $id);
+        $job = Redis::get('job:' . $request->route('job'));
 
         if (is_null($job)) {
             return $this->sendError(result: [], message: 'Job not found', status: 404);
         }
 
-        $status = Redis::get('job:' . $id . ':status');
-        $data = Redis::get('job:' . $id . ':data');
-
-        return $this->sendSuccess([
-            'job' => json_decode($job),
-            'status' => $status,
-            'data' => json_decode($data),
-        ]);
+        return $this->sendSuccess(json_decode(Redis::get('job:' . $request->route('job'))));
     }
 
     /**
@@ -58,16 +55,13 @@ class JobController extends Controller
      */
     public function destroy(Request $request): JsonResponse
     {
-        $id = $request->route('job');
-        $job = Redis::get('job:' . $id);
+        $job = Redis::get('job:' . $request->route('job'));
 
         if (is_null($job)) {
             return $this->sendError(result: [], message: 'Job not found', status: 404);
         }
 
-        Redis::del('job:' . $id);
-        Redis::del('job:' . $id . ':data');
-        Redis::del('job:' . $id . ':status');
+        Redis::del('job:' . $request->route('job'));
 
         return $this->sendSuccess('Job has been deleted');
     }

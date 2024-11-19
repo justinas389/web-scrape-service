@@ -29,13 +29,13 @@ http://localhost
 
 # API
 
-## POST /api/jobs
-
-### Authentication
+## Authentication
 Add to header Bearer Token
 ```bash
 "Authorization": "Bearer {YOUR_AUTH_KEY}"
 ```
+
+## POST /api/jobs
 
 ### Body example
 ```json
@@ -51,7 +51,22 @@ Add to header Bearer Token
                 }
 
             }
+        },
+        {
+            "url": "https://quotes.toscrape.com/tag/friendship/",
+            "selectors": {
+                "wrapper": ".quote",
+                "map": {
+                    "text": ".text",
+                    "author": ".author"
+                }
+
+            }
         }
+
     ]
 }
 ```
+## GET /api/jobs/{id}
+
+## DEL /api/jobs/{id}
