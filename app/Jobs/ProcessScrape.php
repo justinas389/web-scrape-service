@@ -18,14 +18,17 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
     /**
      * Create a new job instance.
      */
-    public function __construct(public array $data) {}
+    public function __construct(
+        public int $id,
+        public array $data
+    ) {}
 
     /**
      * Execute the job.
      */
     public function handle(CrawlerService $crawler): void
     {
-        Redis::hset('job:' . $this->data['id'], 'status', JobStatusEnum::PENDING->value);
+        Redis::set('job:' . $this->id . ':status', JobStatusEnum::PENDING->value);
 
         $crawler->input($this->data['url'])
             ->addStep(Http::get())
@@ -35,10 +38,11 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
             );
 
         foreach ($crawler->run() as $result) {
-            Redis::rpush('job:' .  $this->data['id'] . ':data', json_encode($result->toArray()));
+            $data[] = $result->toArray();
         }
 
-        Redis::hset('job:' . $this->data['id'], 'status', JobStatusEnum::FINISHED->value);
+        Redis::set('job:' .  $this->id . ':data', json_encode($data));
+        Redis::set('job:' . $this->id . ':status', JobStatusEnum::FINISHED->value);
     }
 
     /**
@@ -46,6 +50,6 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
      */
     public function uniqueId(): string
     {
-        return 'scrape_' . $this->data['id'];
+        return 'scrape_' . $this->id;
     }
 }

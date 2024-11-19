@@ -23,7 +23,8 @@ class StoreJobRequest extends FormRequest
     {
         return [
             'scrape.*.url' => 'required|active_url',
-            'scrape.*.selectors' => 'required',
+            'scrape.*.selectors.wrapper' => 'required',
+            'scrape.*.selectors.map' => 'required',
         ];
     }
 }

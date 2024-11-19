@@ -2,15 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\JobStatusEnum;
 use App\Http\Requests\StoreJobRequest;
-use App\Http\Requests\UpdateJobRequest;
 use App\Jobs\ProcessScrape;
-use App\Models\Job;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Support\Facades\Hash;
 
 class JobController extends Controller
 {
@@ -20,22 +16,16 @@ class JobController extends Controller
     public function store(StoreJobRequest $request): JsonResponse
     {   
         foreach ($request->validated()['scrape'] as $scrapeJob) {
-
             $id = Redis::incr('job:id_counter');
-
-            $key = 'job:' . $id;
-
-            Redis::hset($key, 'id', $id);
-            Redis::hset($key, 'url', $scrapeJob['url']);
-            Redis::hset($key, 'status', JobStatusEnum::PENDING->value);
-            Redis::hset($key, 'selectors', json_encode($scrapeJob['selectors']));
-
             $scrapeJob['id'] = $id;
 
-            ProcessScrape::dispatch($scrapeJob);
+            Redis::set('job:' . $id, json_encode($scrapeJob));
+            ProcessScrape::dispatch(id: $id, data: $scrapeJob);
         }
 
-        return response()->json(['message' => 'success']);
+        return $this->sendSuccess([
+            'job' => json_decode(Redis::get('job:' . $id)),
+        ]);
     }
 
     /**
@@ -44,20 +34,21 @@ class JobController extends Controller
     public function show(Request $request): JsonResponse
     {
         $id = $request->route('job');
+        $job = Redis::get('job:' . $id);
 
-        return response()->json([
-            'job' => [
-                'id' => Redis::hget('job:' . $id, 'id'),
-                'url' => Redis::hget('job:' . $id, 'url'),
-                'status' => Redis::hget('job:' . $id, 'status'),
-                'selectors' => json_decode(Redis::hget('job:' . $id, 'selectors')),
-            ],
-            'data' => array_map(function ($item) {
-                return json_decode($item, true); // Decode JSON into an associative array
-            }, Redis::lrange('job:' . $id . ':data', 0, -1))
+        if (is_null($job)) {
+            return $this->sendError(result: [], message: 'Job not found', status: 404);
+        }
+
+        $status = Redis::get('job:' . $id . ':status');
+        $data = Redis::get('job:' . $id . ':data');
+
+        return $this->sendSuccess([
+            'job' => json_decode($job),
+            'status' => $status,
+            'data' => json_decode($data),
         ]);
     }
-
 
     /**
      * Remove the specified resource from storage.
@@ -65,9 +56,16 @@ class JobController extends Controller
     public function destroy(Request $request): JsonResponse
     {
         $id = $request->route('job');
+        $job = Redis::get('job:' . $id);
+
+        if (is_null($job)) {
+            return $this->sendError(result: [], message: 'Job not found', status: 404);
+        }
 
         Redis::del('job:' . $id);
+        Redis::del('job:' . $id . ':data');
+        Redis::del('job:' . $id . ':status');
 
-        return response()->json(true);
+        return $this->sendSuccess('Job has been deleted');
     }
 }
