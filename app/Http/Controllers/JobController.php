@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\JobStatusEnum;
-use App\Http\Requests\StoreJobRequest;
-use App\Jobs\ProcessScrape;
-use Illuminate\Http\JsonResponse;
+use App\Dto\JobData;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Redis;
+use App\Http\Requests\StoreJobRequest;
+use Illuminate\Support\Collection;
 
 class JobController extends Controller
 {
@@ -16,22 +16,11 @@ class JobController extends Controller
      */
     public function store(StoreJobRequest $request): JsonResponse
     {   
-        $jobs = [];
+        $jobs = JobData::collect($request->validated()['scrape'], Collection::class);
 
-        foreach ($request->validated()['scrape'] as $scrapeJob) {
-            $job = [
-                'id' => Redis::incr('job:id_counter'),
-                'url' => $scrapeJob['url'],
-                'selectors' => $scrapeJob['selectors'],
-                'status' => JobStatusEnum::PENDING->value
-            ];
-
-            Redis::set('job:' . $job['id'], json_encode($job));
-
-            ProcessScrape::dispatch($job);
-
-            $jobs[] = $job;
-        }
+        $jobs->each(function  (JobData $job) {
+            $job->save()->dispach();
+        });
 
         return $this->sendSuccess($jobs);
     }
@@ -41,13 +30,13 @@ class JobController extends Controller
      */
     public function show(Request $request): JsonResponse
     {
-        $job = Redis::get('job:' . $request->route('job'));
+        $job = JobData::find($request->route('job'));
 
         if (is_null($job)) {
             return $this->sendError(result: [], message: 'Job not found', status: 404);
         }
 
-        return $this->sendSuccess(json_decode(Redis::get('job:' . $request->route('job'))));
+        return $this->sendSuccess($job);
     }
 
     /**
@@ -55,13 +44,12 @@ class JobController extends Controller
      */
     public function destroy(Request $request): JsonResponse
     {
-        $job = Redis::get('job:' . $request->route('job'));
 
-        if (is_null($job)) {
+        $deleted = JobData::delete($request->route('job'));
+
+        if (! $deleted) {
             return $this->sendError(result: [], message: 'Job not found', status: 404);
         }
-
-        Redis::del('job:' . $request->route('job'));
 
         return $this->sendSuccess('Job has been deleted');
     }

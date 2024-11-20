@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Dto\JobData;
 use App\Enums\JobStatusEnum;
 use App\Services\CrawlerService;
 use Crwlr\Crawler\Steps\Html;
 use Crwlr\Crawler\Steps\Loading\Http;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Contracts\Broadcasting\ShouldBeUnique;
@@ -18,31 +18,31 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
     /**
      * Create a new job instance.
      */
-    public function __construct(public array $data) {}
+    public function __construct(public JobData $jobData) {}
 
     /**
      * Execute the job.
      */
     public function handle(CrawlerService $crawler): void
     {
-        $crawler->input($this->data['url'])
+        $crawler->input($this->jobData->url)
             ->addStep(Http::get())
             ->addStep(
-                Html::each($this->data['selectors']['wrapper'])
-                    ->extract($this->data['selectors']['map'])
+                Html::each($this->jobData->selectors->wrapper)
+                    ->extract($this->jobData->selectors->map)
             );
 
         foreach ($crawler->run() as $result) {
             $data[] = $result->toArray();
         }
 
-        if (! empty($data)) {
-            $this->data['data'] = $data;
+        if (!empty($data)) {
+            $this->jobData->data = $data;
         }
-        
-        $this->data['status'] = JobStatusEnum::FINISHED->value;
 
-        Redis::set('job:' . $this->data['id'], json_encode($this->data));
+        $this->jobData->status = JobStatusEnum::FINISHED->value;
+
+        $this->jobData->save();
     }
 
     /**
@@ -50,6 +50,6 @@ class ProcessScrape implements ShouldQueue, ShouldBeUnique
      */
     public function uniqueId(): string
     {
-        return 'scrape_' . $this->data['id'];
+        return 'scrape_' . $this->jobData->id;
     }
 }
